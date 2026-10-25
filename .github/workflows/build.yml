@@ -1,0 +1,57 @@
+name: Build Windows EXE
+
+# Ne zaman calisir:
+#  - main/master'a push
+#  - Actions sekmesinden elle tetikleme (workflow_dispatch)
+#  - "v1.0.0" gibi bir tag push edildiginde ayrica bir GitHub Release olusturur
+on:
+  push:
+    branches: [ "main", "master" ]
+    tags: [ "v*" ]
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Kodu indir
+        uses: actions/checkout@v4
+
+      - name: Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Bagimliliklari yukle
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: PyInstaller ile .exe derle
+        run: >
+          pyinstaller --noconfirm --clean --onefile --windowed
+          --name BallRaceGenerator
+          --collect-all pymunk
+          --collect-all cv2
+          --collect-all numpy
+          --collect-all pygame
+          gui_launcher.py
+
+      - name: Derlenen exe'yi artifact olarak yukle
+        uses: actions/upload-artifact@v4
+        with:
+          name: BallRaceGenerator-windows
+          path: dist/BallRaceGenerator.exe
+          if-no-files-found: error
+
+      # Sadece "v1.2.3" gibi bir tag push edilirse otomatik bir Release olusturup
+      # exe'yi dogrudan oraya ekler (Actions > Artifacts yerine Releases sekmesinden
+      # indirilebilir hale gelir).
+      - name: Release olustur (sadece tag push'ta)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/BallRaceGenerator.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
